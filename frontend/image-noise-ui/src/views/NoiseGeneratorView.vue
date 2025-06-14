@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ImageViewer from '../components/ImageViewer.vue'
+import ImageViewer from '../components/NoiseViewer.vue'
 import NoiseSelector from '../components/NoiseSelector.vue'
 import NoiseSettings from '../components/NoiseSettings.vue'
 import { useNoiseStore } from '@/stores/noise';
@@ -23,9 +23,7 @@ function saveNoiseImage() {
   } else {
     console.error('Canvas element not found.');
   }
-
 }
-
 </script>
 
 <template>

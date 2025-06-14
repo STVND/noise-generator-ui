@@ -1,5 +1,5 @@
 <script setup lang="ts">
-
+import { RouterLink, RouterView } from 'vue-router';
 </script>
 
 <template>
@@ -18,17 +18,22 @@
   </nav>
 
   <main class="main">
-    <RouterView />
+    <RouterView v-slot="{ Component }">
+      <keep-alive>
+        <component :is="Component" />
+      </keep-alive>
+    </RouterView>
   </main>
   
 </template>
 
-<style scoped>
+<style>
 .main {
   display: table;
   width: auto;
   margin: auto;
   padding: 10px;
+  max-width: 700px;
 }
 
 nav {
