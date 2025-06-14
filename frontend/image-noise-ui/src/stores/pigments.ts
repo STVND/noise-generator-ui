@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';    
 import { getPigmentShaderSources } from '@/utils/shaderCache';
+import { initShaderProgram, loadShader, initBuffers } from '@/utils/webglUtils';
 // fetchAndProcessShader is no longer directly needed here if getPigmentShaderSources handles it.
 
 export interface Pigment {
@@ -125,8 +126,6 @@ export const usePigmentStore = defineStore('pigment', {
             gl.useProgram(shaderProgram);
 
             gl.uniform2f(programInfo.uniformLocations.resolution, gl.canvas.width, gl.canvas.height);
-            // Pass current pigment values from state to the shader
-            // Order for make_pigment: red, blue, yellow, white, black
             gl.uniform1f(programInfo.uniformLocations.red_amount, this.red_value);
             gl.uniform1f(programInfo.uniformLocations.blue_amount, this.blue_value);
             gl.uniform1f(programInfo.uniformLocations.yellow_amount, this.yellow_value);
@@ -150,65 +149,3 @@ export const usePigmentStore = defineStore('pigment', {
     },
 
 })
-
-function initShaderProgram(gl: WebGL2RenderingContext, vsSource: string, fsSource: string): WebGLProgram | null {
-  const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
-  const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
-  if (!vertexShader || !fragmentShader) {
-    return null;
-  }
-
-  const shaderProgram = gl.createProgram();
-      
-  if (!shaderProgram) {
-    return null;
-  }
-
-  gl.attachShader(shaderProgram, vertexShader);
-  gl.attachShader(shaderProgram, fragmentShader);
-  gl.linkProgram(shaderProgram);
-
-  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-    console.error('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
-    gl.deleteProgram(shaderProgram);
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
-    return null;
-  }
-
-  gl.deleteShader(vertexShader);
-  gl.deleteShader(fragmentShader);
-
-  return shaderProgram;
-}
-
-function loadShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader | null {
-  const shader = gl.createShader(type);
-  if (!shader) {
-    console.error('Unable to create shader');
-    return null;
-  }
-
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
-    gl.deleteShader(shader);
-    return null;
-  }
-  return shader;
-}
-
-function initBuffers(gl: WebGL2RenderingContext): { position: WebGLBuffer } | null {
-  const positionBuffer = gl.createBuffer();
-  if (!positionBuffer) {
-    console.error('Failed to create the buffer object');
-    return null;
-  }
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  const positions = [-1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0];
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-  return {position: positionBuffer};
-}

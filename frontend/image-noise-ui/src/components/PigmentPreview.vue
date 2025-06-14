@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, toRefs, watch } from 'vue';
-import type { Pigment } from '@/stores/pigments'; // Make sure Pigment interface is exported from your store
-import { initShaderProgram, initBuffers } from '@/utils/webglUtils'; // fetchAndProcessShader no longer needed here
+import type { Pigment } from '@/stores/pigments';
+import { initShaderProgram, initBuffers } from '@/utils/webglUtils';
 import { getPigmentShaderSources } from '@/utils/shaderCache';
 
 const props = defineProps<{
@@ -9,13 +9,13 @@ const props = defineProps<{
   name: string;
   shaderFragmentPath?: string;
   shaderBasePath?: string;
-  staggerIndex?: number; // For staggering load
+  staggerIndex?: number; 
 }>();
 
 const { pigment, name } = toRefs(props);
 const previewCanvas = ref<HTMLCanvasElement | null>(null);
-const canvasSize = 64; // Reverted to fixed size
-const STAGGER_DELAY_MS = 100; // Base delay per stagger index
+const canvasSize = 64;
+const STAGGER_DELAY_MS = 100;
 
 let gl: WebGL2RenderingContext | null = null;
 let programInfo: {

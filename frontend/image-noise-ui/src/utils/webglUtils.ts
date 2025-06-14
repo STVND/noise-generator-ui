@@ -3,7 +3,7 @@ export function initShaderProgram(gl: WebGL2RenderingContext, vsSource: string, 
   const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
 
   if (!vertexShader || !fragmentShader) {
-    gl.deleteShader(vertexShader); // Ensure cleanup
+    gl.deleteShader(vertexShader);
     gl.deleteShader(fragmentShader);
     return null;
   }
@@ -63,7 +63,7 @@ export function initBuffers(gl: WebGL2RenderingContext): { position: WebGLBuffer
   }
 
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  const positions = [-1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0]; // Covers the entire clip space
+  const positions = [-1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0];
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
   return { position: positionBuffer };
 }
@@ -82,12 +82,10 @@ export async function fetchAndProcessShader(
     let match;
     const includePromises: Promise<{ placeholder: string, content: string }>[] = [];
 
-    // Important: Create a new regex for each exec loop or reset lastIndex if using a global regex in a loop.
-    // Simpler: just re-declare regex or use a non-global one if only one include is expected per line.
-    // For multiple includes in a file, this loop is fine.
+
     while ((match = includeRegex.exec(source)) !== null) {
         const includePath = match[1];
-        const placeholder = match[0]; // Capture the placeholder for this iteration
+        const placeholder = match[0];
         const fullIncludePath = new URL(includePath, new URL(basePath, window.location.origin).href).pathname;
         
         includePromises.push(
@@ -96,7 +94,6 @@ export async function fetchAndProcessShader(
                     if (!res.ok) throw new Error(`Failed to fetch include: ${res.status} ${fullIncludePath}`);
                     return res.text();
                 })
-                // Use the captured placeholder variable
                 .then(content => ({ placeholder: placeholder, content }))
         );
     }

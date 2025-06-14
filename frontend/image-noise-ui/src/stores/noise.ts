@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import Rand from 'rand-seed';
+import { initShaderProgram, loadShader, initBuffers } from '@/utils/webglUtils';
 
 
 export enum NoiseType {
@@ -72,12 +73,13 @@ export const useNoiseStore = defineStore('noise', {
         gl_Position = aVertexPosition;
       }`;
 
-      const shaderPath = '/noise_shaders/white_noise.frag';
+      // Path relative to the 'public' directory
+      const shaderRelativePath = 'noise_shaders/white_noise.frag';
       let fsSource: string;
       try {
-        fsSource = await fetch(shaderPath).then(res => {
+        fsSource = await fetch(`${import.meta.env.BASE_URL}${shaderRelativePath}`).then(res => {
           if (!res.ok) {
-            throw new Error(`Failed to fetch shader: ${res.status} ${res.statusText} from ${shaderPath}`);
+            throw new Error(`Failed to fetch shader: ${res.status} ${res.statusText} from ${import.meta.env.BASE_URL}${shaderRelativePath}`);
           }
           return res.text();
         });
@@ -146,12 +148,13 @@ export const useNoiseStore = defineStore('noise', {
         gl_Position = aVertexPosition;
       }`;
 
-      const shaderPath = '/noise_shaders/simplex_noise.frag';
+      // Path relative to the 'public' directory
+      const shaderRelativePath = 'noise_shaders/simplex_noise.frag';
       let fsSource: string;
       try {
-        fsSource = await fetch(shaderPath).then(res => {
+        fsSource = await fetch(`${import.meta.env.BASE_URL}${shaderRelativePath}`).then(res => {
           if (!res.ok) {
-            throw new Error(`Failed to fetch shader: ${res.status} ${res.statusText} from ${shaderPath}`);
+            throw new Error(`Failed to fetch shader: ${res.status} ${res.statusText} from ${import.meta.env.BASE_URL}${shaderRelativePath}`);
           }
           return res.text();
         });
@@ -226,12 +229,13 @@ export const useNoiseStore = defineStore('noise', {
         gl_Position = aVertexPosition;
       }`;
 
-      const shaderPath = '/noise_shaders/worley_noise.frag';
+      // Path relative to the 'public' directory
+      const shaderRelativePath = 'noise_shaders/worley_noise.frag';
       let fsSource: string;
       try {
-        fsSource = await fetch(shaderPath).then(res => {
+        fsSource = await fetch(`${import.meta.env.BASE_URL}${shaderRelativePath}`).then(res => {
           if (!res.ok) {
-            throw new Error(`Failed to fetch shader: ${res.status} ${res.statusText} from ${shaderPath}`);
+            throw new Error(`Failed to fetch shader: ${res.status} ${res.statusText} from ${import.meta.env.BASE_URL}${shaderRelativePath}`);
           }
           return res.text();
         });
@@ -308,65 +312,3 @@ export const useNoiseStore = defineStore('noise', {
     },
   }
 });
-
-function initShaderProgram(gl: WebGL2RenderingContext, vsSource: string, fsSource: string): WebGLProgram | null {
-  const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
-  const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
-  if (!vertexShader || !fragmentShader) {
-    return null;
-  }
-
-  const shaderProgram = gl.createProgram();
-      
-  if (!shaderProgram) {
-    return null;
-  }
-
-  gl.attachShader(shaderProgram, vertexShader);
-  gl.attachShader(shaderProgram, fragmentShader);
-  gl.linkProgram(shaderProgram);
-
-  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-    console.error('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
-    gl.deleteProgram(shaderProgram);
-    gl.deleteShader(vertexShader);
-    gl.deleteShader(fragmentShader);
-    return null;
-  }
-
-  gl.deleteShader(vertexShader);
-  gl.deleteShader(fragmentShader);
-
-  return shaderProgram;
-}
-
-function loadShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader | null {
-  const shader = gl.createShader(type);
-  if (!shader) {
-    console.error('Unable to create shader');
-    return null;
-  }
-
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
-    gl.deleteShader(shader);
-    return null;
-  }
-  return shader;
-}
-
-function initBuffers(gl: WebGL2RenderingContext): { position: WebGLBuffer } | null {
-  const positionBuffer = gl.createBuffer();
-  if (!positionBuffer) {
-    console.error('Failed to create the buffer object');
-    return null;
-  }
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  const positions = [-1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0];
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-  return {position: positionBuffer};
-}

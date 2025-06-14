@@ -138,52 +138,44 @@ initializeRandomSliderValues();
 </template>
 
 <style scoped>
-/* General table styling to center content */
+
 table {
-  display: grid; /* Changed from flex to grid for easier centering of the table itself */
-  justify-items: center; /* Center items within the grid (table cells) */
+  display: grid;
+  justify-items: center;
   margin-left: auto;
   margin-right: auto;
   margin-bottom: 20px;
-  width: auto; /* Allow table to size to content */
+  width: auto;
 }
 
 
 tr {
-  display: flex; /* Use flex for items within a row */
-  justify-content: center; /* Center content horizontally within rows */
-  align-items: center; /* Align items vertically in the center */
-  margin-bottom: 5px; /* Add a bit of space between rows */
-  width: 100%; /* Ensure rows take up available width for centering */
+  display: flex;
+  justify-content: center; 
+  align-items: center;
+  margin-bottom: 5px;
+  width: 100%; 
 }
 
-/* Styling for table cells */
 td {
     padding: 8px;
-    vertical-align: middle; /* Better vertical alignment for mixed content */
-    text-align: center; /* Center text within table cells */
-}
-
-/* Specific styling for slider rows to ensure good layout */
-.pigment-slider-row td:first-child {
-  /* The PigmentPreview itself is a flex container, so it will center its content. */
-  /* We can add a min-width if needed, but flex should handle it. */
-  /* min-width: 150px; */ /* Adjust if previews + names cause inconsistent widths */
+    vertical-align: middle;
+    text-align: center;
 }
 
 .pigment-slider-row input[type="range"] {
-  width: 200px; /* Adjust slider width as needed */
-  margin: 0 10px; /* Add some horizontal margin around the slider */
+  width: 200px;
+  margin: 0 10px;
 }
 
 .pigment-slider-row td:last-child {
-    min-width: 40px; /* Ensure space for the numeric value */
-    text-align: right; /* Align numeric value to the right */
+    min-width: 40px;
+    text-align: right;
 }
 
 .hex-copy-button {
   padding: 8px 15px;
-  font-family: monospace; /* Good for hex codes */
+  font-family: monospace;
   background-color: #333;
   color: white;
   border: 1px solid #555;
