@@ -1,91 +1,29 @@
 <script setup lang="ts">
-import ImageViewer from './components/ImageViewer.vue'
-import NoiseSelector from './components/NoiseSelector.vue'
-import { useNoiseStore } from '@/stores/noise';
-import { storeToRefs } from 'pinia';
-
-const store = useNoiseStore();
-const { noise_type } = storeToRefs(store);
-
-async function generateNoiseImage() {
-  await store.createNoiseImage();
-}
-
-function saveNoiseImage() {
-  const canvas: HTMLCanvasElement = document.getElementById('noiseImage') as HTMLCanvasElement;
-  if (canvas) {
-    const imageUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.href = imageUrl;
-    const fileName = store.noise_type + '_' + crypto.randomUUID();
-
-    link.download = fileName + '_.png';
-    link.click();
-    document.body.appendChild(link);
-  } else {
-    console.error('Canvas element not found.');
-  }
-
-}
 
 </script>
 
 <template>
-  <header>
-  </header>
+  <nav>
+    <ul>
+      <li>
+        <RouterLink to="/">Home</RouterLink>
+      </li>
+      <li>
+        <RouterLink to="/noise-generator">Noise Generator</RouterLink>
+      </li>
+      <li>
+        <RouterLink to="/pigment-mixer">Pigment Mixer</RouterLink>
+      </li>
+    </ul>
+  </nav>
 
   <main class="main">
-    <table>
-      <tbody>
-        <tr id="viewer">
-          <td>
-            <ImageViewer />
-          </td>
-        </tr>
-        <tr>
-          Viewer Size: 512x512
-        </tr>
-        <tr id="noiseInteractors">
-          <td>
-            <NoiseSelector />
-          </td>
-          <td>
-            <button @click="generateNoiseImage">
-              Generate Noise
-            </button>
-          </td>
-          <td>
-            <button @click="saveNoiseImage">
-              Save Image
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    <table id="description">
-      <tbody>
-        <tr>
-          <td> Description: </td>
-        </tr>
-        <tr>
-          <td> {{ store.description }} </td>
-        </tr>
-      </tbody>
-    </table>
+    <RouterView />
   </main>
-
+  
 </template>
 
 <style scoped>
-header {
-  line-height: 1.5;
-}
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
 .main {
   display: table;
   width: auto;
@@ -93,27 +31,41 @@ header {
   padding: 10px;
 }
 
-tr {
-  display: flex;
-  justify-content: center;
-  margin: 5px
-}
-
-table {
-  display: grid;
-  justify-content: center;
-}
-
-#noiseInteractors {
-  display: flex;
-  justify-content: space-between;
+nav {
   width: 100%;
+  padding-block: 10px;
 }
 
-#description {
-  display: grid;
-  justify-content: center;
-  width: 600px
+nav ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
 }
 
+nav ul li a {
+  display: block;
+  padding: 10px 15px;
+  min-width: 15ch;
+  text-align: center;
+  font-size: larger;
+  color: #e0e0e0;
+  background-color: #191919;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+nav ul li a:hover {
+  background-color: #333333; 
+}
+
+nav ul li a.router-link-exact-active {
+  font-weight: bold;
+  color: #deeeed;
+  text-decoration: underline;
+  background-color: #444444;
+}
 </style>

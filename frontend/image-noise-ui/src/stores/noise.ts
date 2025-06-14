@@ -1,16 +1,11 @@
 import { defineStore } from 'pinia';
 import Rand from 'rand-seed';
-import alea from 'alea';
-import { createNoise2D } from 'simplex-noise';
-import { Delaunay, Voronoi } from 'd3-delaunay';
 
 
 export enum NoiseType {
     WHITE_NOISE = "white_noise",
     SIMPLEX = "simplex",
-    SIMPLEX_WORLEY = "simplex_worley",
     WORLEY = "worley",
-    FBM = "fBM",
 }
 
 interface NoiseState {
@@ -18,120 +13,360 @@ interface NoiseState {
   noise_image: ImageBitmap | null;
   size: number;
   description: string;
+  scale: number;
+  disorder: number;
+  tiling: number;
+  lacunarity: number;
+  seed: string;
+  seedToggle: boolean;
 }
 
 export const useNoiseStore = defineStore('noise', {
   state: (): NoiseState => ({
-    noise_type: NoiseType.WHITE_NOISE,
+    noise_type: NoiseType.WORLEY,
     noise_image: null,
-    size: 256, 
-    description: ""
+    size: 128, 
+    description: "",
+    scale: Math.round(Math.random() * 90.0 + 1.0) / 10.0,
+    disorder: Math.round(Math.random() * 1000.0) / 10.0,
+    tiling: 2.0,
+    lacunarity: 2.0,
+    seed: String(Math.round(Math.random() * 5000)),
+    seedToggle: false,
   }),
   actions: {
     async createNoiseImage() {
+      if (!this.seedToggle)  {
+        this.seed = String(Math.round(Math.random() * 5000));
+      }
+
       switch (this.noise_type) {
         case NoiseType.WHITE_NOISE:
           await this.createWhiteNoiseImage();
           break;
-        case (NoiseType.SIMPLEX):
-          await this.createSimplexNoiseImage();
+        case NoiseType.SIMPLEX:
+          await this.createSimplexNoiseImage(this.scale, this.tiling, this.lacunarity);
+          break;
+        case NoiseType.WORLEY:
+          await this.createWorleyNoiseImage(this.scale, this.disorder, this.tiling);
           break;
         default:
           alert("Unable to process request.")
           break;
         }
     },
-    async createWhiteNoiseImage(seed?: string) {
-      const rand = new Rand(seed)
-      const offscreenCanvas: OffscreenCanvas = new OffscreenCanvas(this.size, this.size);
-      const ctx: OffscreenCanvasRenderingContext2D | null = offscreenCanvas.getContext('2d');
+    async createWhiteNoiseImage() {
+      const rand = new Rand(this.seed);
+      const offscreenCanvas = new OffscreenCanvas(this.size, this.size);
+      const gl = offscreenCanvas.getContext('webgl2');
 
-      if (!ctx) {
-        throw new Error('Could not get 2D context from offscreen canvas');
+      if (!gl) {
+        console.error('WebGL2 not supported or could not get WebGL context.');
+
+        throw new Error('WebGL2 not supported or could not get WebGL context.');
       }
 
-      const imageData: ImageData = ctx.createImageData(this.size, this.size);
-      const pixels: any = imageData.data;
+      const vsSource = `#version 300 es
+      in vec4 aVertexPosition;
+      void main() {
+        gl_Position = aVertexPosition;
+      }`;
 
+      const shaderPath = '/noise_shaders/white_noise.frag';
+      let fsSource: string;
+      try {
+        fsSource = await fetch(shaderPath).then(res => {
+          if (!res.ok) {
+            throw new Error(`Failed to fetch shader: ${res.status} ${res.statusText} from ${shaderPath}`);
+          }
+          return res.text();
+        });
+      } catch (error) {
+        console.error("ERROR fetching fragment shader: ", error);
+        throw error;
+      }        
 
-      for (let y = 0; y < this.size; y++) {
-        for (let x = 0; x < this.size; x++) {
-          const index: number = (y * this.size + x) * 4;
-          const pixelValue: number = Math.floor(rand.next() * 256);
-
-          pixels[index] = pixelValue;
-          pixels[index + 1] = pixelValue;
-          pixels[index + 2] = pixelValue;
-          pixels[index + 3] = 255;
-
-        }
+      const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+      if (!shaderProgram) {
+        return;
       }
 
-      ctx.putImageData(imageData, 0, 0);
+      const programInfo = {
+        program: shaderProgram,
+        attribLocations: {
+          vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+        },
+        uniformLocations: {
+          resolution: gl.getUniformLocation(shaderProgram, 'u_resolution'),
+          seed: gl.getUniformLocation(shaderProgram, 'u_seed'),
+        },
+      }
+
+      const buffers = initBuffers(gl);
+      if (!buffers) {
+        return;
+      }
+
+      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+      gl.clearColor(0.0, 0.0, 0.0, 0.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(shaderProgram);
+
+      gl.uniform2f(programInfo.uniformLocations.resolution, gl.canvas.width, gl.canvas.height);
+      gl.uniform1f(programInfo.uniformLocations.seed, rand.next());
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+      gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
       try {
         this.noise_image = await createImageBitmap(offscreenCanvas);
+
       } catch (error) {
-        console.error('Error creating image bitmap:', error);
+        console.error('Error creating image bitmap frow WebGL2 canvas:', error);
       }
 
     },
 
-    async createSimplexNoiseImage(seed?: string) {
-      const rand = new Rand(seed)
-      const offscreenCanvas: OffscreenCanvas = new OffscreenCanvas(this.size, this.size);
-      const ctx: OffscreenCanvasRenderingContext2D | null = offscreenCanvas.getContext('2d');
-      const noise2D = createNoise2D(alea(rand.next()));
+    async createSimplexNoiseImage(scale: number, tiling: number, lacunarity: number) {
+      const rand = new Rand(this.seed);
+      const offscreenCanvas = new OffscreenCanvas(this.size, this.size);
+      const gl = offscreenCanvas.getContext('webgl2');
 
-      if (!ctx) {
-        throw new Error('Could not get 2D context from offscreen canvas');
+      if (!gl) {
+        console.error('WebGL2 not supported or could not get WebGL context.');
+        throw new Error('WebGL2 not supported or could not get WebGL context.');
       }
 
-      const imageData: ImageData = ctx.createImageData(this.size, this.size);
-      const pixels: any = imageData.data;
+      const vsSource = `#version 300 es
+      in vec4 aVertexPosition;
+      void main() {
+        gl_Position = aVertexPosition;
+      }`;
 
-      for (let x = 0; x < this.size; x++ ) {
-        for (let y = 0; y < this.size; y++) {
-          const index: number = (y * this.size + x) * 4;
-          const pixelValue: number = Math.floor(noise2D(x , y) * 256);
+      const shaderPath = '/noise_shaders/simplex_noise.frag';
+      let fsSource: string;
+      try {
+        fsSource = await fetch(shaderPath).then(res => {
+          if (!res.ok) {
+            throw new Error(`Failed to fetch shader: ${res.status} ${res.statusText} from ${shaderPath}`);
+          }
+          return res.text();
+        });
+      } catch (error) {
+        console.error("ERROR fetching fragment shader: ", error);
+        throw error;
+      }        
 
-          pixels[index] = pixelValue;
-          pixels[index + 1] = pixelValue;
-          pixels[index + 2] = pixelValue;
-          pixels[index + 3] = 255;
-        }
+      const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+      if (!shaderProgram) {
+        return;
       }
 
-      ctx.putImageData(imageData, 0, 0);
+      const programInfo = {
+        program: shaderProgram,
+        attribLocations: {
+          vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+        },
+        uniformLocations: {
+          resolution: gl.getUniformLocation(shaderProgram, 'u_resolution'),
+          seed: gl.getUniformLocation(shaderProgram, 'u_seed'),
+          scale: gl.getUniformLocation(shaderProgram, 'u_scale'),
+          tiling: gl.getUniformLocation(shaderProgram, 'u_tiling'),
+          lacunarity: gl.getUniformLocation(shaderProgram, 'u_lacunarity'),
+        },
+      }
+
+      const buffers = initBuffers(gl);
+      if (!buffers) {
+        return;
+      }
+
+      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+      gl.clearColor(0.0, 0.0, 0.0, 0.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(shaderProgram);
+
+      gl.uniform2f(programInfo.uniformLocations.resolution, this.size, this.size);
+      gl.uniform1f(programInfo.uniformLocations.seed, rand.next());
+      gl.uniform1f(programInfo.uniformLocations.scale, scale);
+      gl.uniform1f(programInfo.uniformLocations.tiling, tiling);
+      gl.uniform1f(programInfo.uniformLocations.lacunarity, lacunarity);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+      gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
       try {
         this.noise_image = await createImageBitmap(offscreenCanvas);
+
       } catch (error) {
-        console.error('Error creating image bitmap:', error);
+        console.error('Error creating image bitmap frow WebGL2 canvas:', error);
       }
+
+    },
+
+    async createWorleyNoiseImage(scale: number, disorder: number, tiling: number) {
+      const rand = new Rand(this.seed);
+      const offscreenCanvas = new OffscreenCanvas(this.size, this.size);
+      const gl = offscreenCanvas.getContext('webgl2');
+
+      if (!gl) {
+        console.error('WebGL2 not supported or could not get WebGL context.');
+        throw new Error('WebGL2 not supported or could not get WebGL context.');
+      }
+
+      const vsSource = `#version 300 es
+      in vec4 aVertexPosition;
+      void main() {
+        gl_Position = aVertexPosition;
+      }`;
+
+      const shaderPath = '/noise_shaders/worley_noise.frag';
+      let fsSource: string;
+      try {
+        fsSource = await fetch(shaderPath).then(res => {
+          if (!res.ok) {
+            throw new Error(`Failed to fetch shader: ${res.status} ${res.statusText} from ${shaderPath}`);
+          }
+          return res.text();
+        });
+      } catch (error) {
+        console.error("ERROR fetching fragment shader: ", error);
+        throw error;
+      }        
+
+      const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+      if (!shaderProgram) {
+        return;
+      }
+
+      const programInfo = {
+        program: shaderProgram,
+        attribLocations: {
+          vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+        },
+        uniformLocations: {
+          resolution: gl.getUniformLocation(shaderProgram, 'u_resolution'),
+          seed: gl.getUniformLocation(shaderProgram, 'u_seed'),
+          scale: gl.getUniformLocation(shaderProgram, 'u_scale'),
+          disorder: gl.getUniformLocation(shaderProgram, 'u_disorder'),
+          tiling: gl.getUniformLocation(shaderProgram, 'u_tiling'),
+        },
+      }
+
+      const buffers = initBuffers(gl);
+      if (!buffers) {
+        return;
+      }
+
+      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+      gl.clearColor(0.0, 0.0, 0.0, 0.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(shaderProgram);
+
+      gl.uniform2f(programInfo.uniformLocations.resolution, gl.canvas.width, gl.canvas.height);
+      gl.uniform1f(programInfo.uniformLocations.seed, rand.next());
+      gl.uniform1f(programInfo.uniformLocations.scale, scale);
+      gl.uniform1f(programInfo.uniformLocations.disorder, disorder);
+      gl.uniform1f(programInfo.uniformLocations.tiling, tiling);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+      gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 2, gl.FLOAT, false, 0, 0);
+      gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+      try {
+        this.noise_image = await createImageBitmap(offscreenCanvas);
+
+      } catch (error) {
+        console.error('Error creating image bitmap frow WebGL2 canvas:', error);
+      }
+
     },
 
     updateDescription() {
       switch (this.noise_type) {
         case NoiseType.WHITE_NOISE:
-          this.description = "White noise is a set of randomly generated noise."
-          break;
-        case NoiseType.FBM:
-          this.description = "Fractional Brownian Moiton. Noise generated by multiple iterations of a noise function."
+          this.description = "Noise is randomly generated at each pixel."
           break;
         case NoiseType.WORLEY:
-          this.description = "Procedural noise that creates cell-like patterns. Also known as Voronoi or Cellular noise."
+          this.description = "Noise is divided into 'cells' and measures the distance between points. Texture is tileable at all densities. Also known as Voronoi or Cellular noise"
           break;
         case NoiseType.SIMPLEX:
-          this.description = "Procedurally generated noise that produces a smooth, natural-looking pattern."
-          break;
-        case NoiseType.SIMPLEX_WORLEY:
-          this.description = "Combination of Simplex and Worley noise."
+          this.description = "Implementation of OpenSimplex2 with 2 octaves of noise. Texture is tileable when density is set to 100."
           break;
         default:
-          this.description = ""
+          this.description = "Something Broke!"
           break;
       }
     },
   }
-  })
+});
+
+function initShaderProgram(gl: WebGL2RenderingContext, vsSource: string, fsSource: string): WebGLProgram | null {
+  const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+  const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+  if (!vertexShader || !fragmentShader) {
+    return null;
+  }
+
+  const shaderProgram = gl.createProgram();
+      
+  if (!shaderProgram) {
+    return null;
+  }
+
+  gl.attachShader(shaderProgram, vertexShader);
+  gl.attachShader(shaderProgram, fragmentShader);
+  gl.linkProgram(shaderProgram);
+
+  if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+    console.error('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+    gl.deleteProgram(shaderProgram);
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+    return null;
+  }
+
+  gl.deleteShader(vertexShader);
+  gl.deleteShader(fragmentShader);
+
+  return shaderProgram;
+}
+
+function loadShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader | null {
+  const shader = gl.createShader(type);
+  if (!shader) {
+    console.error('Unable to create shader');
+    return null;
+  }
+
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    console.error('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+    gl.deleteShader(shader);
+    return null;
+  }
+  return shader;
+}
+
+function initBuffers(gl: WebGL2RenderingContext): { position: WebGLBuffer } | null {
+  const positionBuffer = gl.createBuffer();
+  if (!positionBuffer) {
+    console.error('Failed to create the buffer object');
+    return null;
+  }
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  const positions = [-1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0];
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+  return {position: positionBuffer};
+}
