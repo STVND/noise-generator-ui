@@ -1,0 +1,62 @@
+name: Deploy Vue App to GitHub Pages
+
+on:
+  # Runs on pushes targeting the default branch (likely main or master)
+  push:
+    branches: ["main"] # Adjust if your default branch is different, e.g., "master"
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18" # Or your project's Node.js version
+          cache: 'npm'
+          cache-dependency-path: frontend/image-noise-ui/package-lock.json # Path to your Vue app's lock file
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./frontend/image-noise-ui # Path to your Vue app
+
+      - name: Build application
+        run: npm run build # This will use your vite.config.ts base path
+        working-directory: ./frontend/image-noise-ui # Path to your Vue app
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./frontend/image-noise-ui/dist # Path to the built static files of your Vue app
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
