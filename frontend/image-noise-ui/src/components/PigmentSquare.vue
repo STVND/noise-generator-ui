@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { usePigmentStore } from '@/stores/pigment';
+import { usePigmentStore } from '@/stores/pigments';
 import { storeToRefs } from 'pinia';
 
 

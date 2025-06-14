@@ -9,19 +9,22 @@ import pluginVitest from '@vitest/eslint-plugin'
 
 export default defineConfigWithVueTs(
   {
-    name: 'app/files-to-lint',
+    name: 'app/project-files-glob',
     files: ['**/*.{ts,mts,tsx,vue}'],
-  },
 
+  },
   {
-    // Standard way to define global ignores in ESLint flat config
+    name: 'app/global-ignores',
     ignores: ['**/dist/**', '**/dist-ssr/**', '**/coverage/**'],
   },
 
+  // Base Vue and TypeScript configurations
   pluginVue.configs['flat/essential'],
-  vueTsConfigs.recommended,
-  
+  ...vueTsConfigs.recommended,
+
+
   {
+    name: 'app/vitest-config',
     ...pluginVitest.configs.recommended,
     files: ['src/**/__tests__/*'],
   },
