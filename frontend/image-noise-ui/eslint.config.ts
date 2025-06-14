@@ -21,19 +21,13 @@ const configs: Linter.Config[] = [
   },
 
   // Base Vue configuration
-  // Cast to Linter.FlatConfig for type explicitness if its own type is more complex but compatible.
   pluginVue.configs['flat/essential'] as Linter.Config,
 
-  // Recommended TypeScript configurations for Vue from @vue/eslint-config-typescript
-  // vueTsConfigs.recommended is already Linter.FlatConfig[]
-  ...vueTsConfigs.recommended,
 
   // Vitest configuration
   {
     name: 'app/vitest-config',
     files: ['src/**/__tests__/*'],
-    // Spread Vitest recommended config (which includes plugins, rules, etc.)
-    // Cast for type explicitness if its own type is more complex but compatible.
     ...(pluginVitest.configs.recommended as Linter.Config),
   },
 ];
