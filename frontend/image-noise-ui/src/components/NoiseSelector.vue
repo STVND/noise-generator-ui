@@ -10,7 +10,7 @@ const store = useNoiseStore();
 const { noise_type } = storeToRefs(store);
 
 const selected_noise = ref<NoiseType>(noise_type.value);
-const selected_resolution = ref<number>(128);
+const selected_resolution = ref<number>(32);
 
 watch(selected_noise, (newValue: NoiseType) => {
     if (newValue !== noise_type.value) {

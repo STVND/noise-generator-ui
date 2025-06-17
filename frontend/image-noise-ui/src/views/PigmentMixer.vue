@@ -1,38 +1,27 @@
 <script setup lang="ts">
 import { watch, ref, onMounted } from 'vue';
 import PigmentViewer from '@/components/PigmentViewer.vue';
-import PigmentPreview from '@/components/PigmentPreview.vue';
-import type { Pigment } from '@/stores/pigments'; // Corrected import path
 import { usePigmentStore } from '@/stores/pigments';
 import { storeToRefs } from 'pinia';
+
+import whiteImage from '/pigment-colors/white.png';
+import redImage from '/pigment-colors/red.png';
+import blueImage from '/pigment-colors/blue.png';
+import yellowImage from '/pigment-colors/yellow.png';
+import blackImage from '/pigment-colors/black.png';
 
 const store = usePigmentStore();
 const { white_value, red_value, blue_value, yellow_value, black_value, pigment_image } = storeToRefs(store);
 
-// Define pure pigment objects for the previews
-const pureWhite: Pigment = { white: 1.0, red: 0.0, blue: 0.0, yellow: 0.0, black: 0.0 };
-const pureRed: Pigment = { white: 0.0, red: 1.0, blue: 0.0, yellow: 0.0, black: 0.0 };
-const pureBlue: Pigment = { white: 0.0, red: 0.0, blue: 1.0, yellow: 0.0, black: 0.0 };
-const pureYellow: Pigment = { white: 0.0, red: 0.0, blue: 0.0, yellow: 1.0, black: 0.0 };
-const pureBlack: Pigment = { white: 0.0, red: 0.0, blue: 0.0, yellow: 0.0, black: 1.0 };
-
-const predefinedPigments: { name: string, value: Pigment }[] = [
-  { name: "White", value: pureWhite },
-  { name: "Red", value: pureRed },
-  { name: "Blue", value: pureBlue },
-  { name: "Yellow", value: pureYellow },
-  { name: "Black", value: pureBlack },
-];
 
 const pigmentComponents = [
-  { name: 'Red',    valueRef: red_value,    previewPigment: pureRed },
-  { name: 'Blue',   valueRef: blue_value,   previewPigment: pureBlue },
-  { name: 'Yellow', valueRef: yellow_value, previewPigment: pureYellow },
-  { name: 'White',  valueRef: white_value,  previewPigment: pureWhite },
-  { name: 'Black',  valueRef: black_value,  previewPigment: pureBlack },
+  { name: 'Red',    valueRef: red_value,    imageSrc: redImage },
+  { name: 'Blue',   valueRef: blue_value,   imageSrc: blueImage },
+  { name: 'Yellow', valueRef: yellow_value, imageSrc: yellowImage },
+  { name: 'White',  valueRef: white_value,  imageSrc: whiteImage },
+  { name: 'Black',  valueRef: black_value,  imageSrc: blackImage },
 ];
 
-// Simple debounce function
 function debounce<T extends (...args: any[]) => void>(func: T, delay: number): (...args: Parameters<T>) => void {
   let timeoutId: number | undefined;
   return (...args: Parameters<T>) => {
@@ -45,7 +34,7 @@ function debounce<T extends (...args: any[]) => void>(func: T, delay: number): (
 
 const debouncedUpdatePigment = debounce(() => {
   store.updatePigment();
-}, 300); // Update after 300ms of inactivity
+}, 200);
 
 watch([white_value, red_value, blue_value, yellow_value, black_value], debouncedUpdatePigment);
 
@@ -63,37 +52,37 @@ function rgbToHex(r: number, g: number, b: number): string {
 
 async function updateHexColorFromImageBitmap(imageBitmap: ImageBitmap | null) {
   if (!imageBitmap) {
-    currentHexColor.value = '#000000'; // Default or error color
+    currentHexColor.value = '#000000';
     copyButtonText.value = 'N/A';
     return;
   }
-  // Use OffscreenCanvas to avoid adding to the DOM
+
   const offscreenCanvas = new OffscreenCanvas(1, 1);
   const ctx = offscreenCanvas.getContext('2d');
   if (ctx) {
     ctx.drawImage(imageBitmap, 0, 0);
     const pixelData = ctx.getImageData(0, 0, 1, 1).data;
     currentHexColor.value = rgbToHex(pixelData[0], pixelData[1], pixelData[2]);
-    copyButtonText.value = currentHexColor.value; // Update button text with the new hex
+    copyButtonText.value = currentHexColor.value;
   }
 }
 
 watch(pigment_image, (newImageBitmap) => {
   updateHexColorFromImageBitmap(newImageBitmap);
-}, { immediate: true }); // immediate: true to run on initial load if pigment_image is already set
+}, { immediate: true });
 
 async function copyHexToClipboard() {
   if (currentHexColor.value && currentHexColor.value !== 'N/A') {
     await navigator.clipboard.writeText(currentHexColor.value);
     copyButtonText.value = 'Copied!';
-    setTimeout(() => { copyButtonText.value = currentHexColor.value; }, 1500); // Reset after 1.5s
+    setTimeout(() => { copyButtonText.value = currentHexColor.value; }, 1500);
   }
 }
 
 function initializeRandomSliderValues() {
   pigmentComponents.forEach(component => {
     if (component.name === 'Red' || component.name === 'Blue' || component.name === 'Yellow') {
-      component.valueRef.value = Math.random(); // Assigns a float between 0.0 and 1.0
+      component.valueRef.value = Math.random();
     }
   });
 }
@@ -113,16 +102,11 @@ initializeRandomSliderValues();
             </tr>
 
             <tr v-for="(component, index) in pigmentComponents" :key="component.name" class="pigment-slider-row">
-                <td>
-                    
-                    <label>
-                        <PigmentPreview 
-                        :name="component.name" 
-                        :pigment="component.previewPigment"
-                        :staggerIndex="index" 
-                        shaderFragmentPath="/pigment_shaders/pigment.frag"
-                        shaderBasePath="/pigment_shaders/" />
-                    </label>
+                <td class="pigment-preview-cell">
+                    <div class="pigment-preview-item">
+                        <img :src="component.imageSrc" :alt="component.name" :title="component.name" class="pigment-image-display" />
+                        <span class="pigment-name">{{ component.name }}</span>
+                    </div>
                 </td>
                 <td>
                     <input 
@@ -163,6 +147,11 @@ td {
     text-align: center;
 }
 
+.pigment-preview-cell {
+    display: flex;
+    justify-content: flex-start;
+}
+
 .pigment-slider-row input[type="range"] {
   width: 200px;
   margin: 0 10px;
@@ -171,6 +160,25 @@ td {
 .pigment-slider-row td:last-child {
     min-width: 40px;
     text-align: right;
+}
+
+.pigment-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pigment-image-display {
+  width: 40px; 
+  height: 40px; 
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.pigment-name {
+    font-size: 0.9em;
+    width: 10ch;
 }
 
 .hex-copy-button {

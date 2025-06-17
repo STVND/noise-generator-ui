@@ -27,7 +27,7 @@
                     <input type="text" v-model="store.scale" >
                 </td>
                 <td>
-                    <input type="range" min="1.0" max="100" step=".1" v-model="store.scale">
+                    <input type="range" min="1.0" max="50" step=".1" v-model="store.scale">
                 </td>
             </tr>
             <tr class="lacunarity_row" v-if="store.noise_type=='simplex'">
@@ -53,7 +53,7 @@
                     <input type="text" v-model="store.disorder">
                 </td>
                 <td>
-                    <input type="range" min="0.0" max="50" step=".1" v-model="store.disorder">
+                    <input type="range" min="0.0" max="25" step=".1" v-model="store.disorder">
                 </td>
             </tr>
         </tbody>
