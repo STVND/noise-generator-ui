@@ -26,7 +26,7 @@ export const useNoiseStore = defineStore('noise', {
   state: (): NoiseState => ({
     noise_type: NoiseType.WORLEY,
     noise_image: null,
-    size: 128, 
+    size: 32, 
     description: "",
     scale: Math.round(Math.random() * 40.0) / 10.0 + 6.0,
     disorder: Math.round(Math.random() * 200.0) / 10.0 + 2.0,
